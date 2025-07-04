@@ -1,5 +1,12 @@
+:root {
+  --grid-size: 10;
+}
+
 .App {
   text-align: center;
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .App-logo {
