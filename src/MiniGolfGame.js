@@ -1,11 +1,11 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import './GolfGameStyles.css';
 
-// Constants
-const CELL_SIZE = 40;
-const BALL_SIZE = 10;
-const HOLE_SIZE = 15;
-const GRID_SIZE = 20;
+// Update the constants at the top of the file
+const CELL_SIZE = 30; // Reduced from 40
+const BALL_SIZE = 8; // Reduced from 10
+const HOLE_SIZE = 12; // Reduced from 15
+const GRID_SIZE = 15; // Reduced from 20
 const WIN_DISTANCE = 0.5;
 
 const MiniGolfGame = () => {
@@ -357,76 +357,89 @@ const MiniGolfGame = () => {
   };
 
   // Update the return statement to include instructions and stroke count
-  return (
-    <div className="game-wrapper">
-      <div className="game-info">
-        <h2>Mini Golf</h2>
-        <p>Strokes: {strokes}</p>
-        <div className="instructions">
-          <h3>How to Play:</h3>
-          <ul>
-            <li>Click and drag from the ball to aim</li>
-            <li>Release to shoot</li>
-            <li>Get the ball in the hole</li>
-            <li>Use as few strokes as possible</li>
-          </ul>
-        </div>
-        {gameWon && <div className="win-message">You won in {strokes} strokes!</div>}
+  // Update the return statement with new layout
+return (
+  <div className="game-page">
+    <div className="instructions-panel">
+      <h2>Mini Golf</h2>
+      <div className="game-controls">
+        <div className="strokes">Strokes: {strokes}</div>
         <button onClick={() => {
           resetGame();
           setGameWon(false);
         }}>Reset Game</button>
-        <button onClick={() => setEditMode(!editMode)}>
+        <button 
+          onClick={() => setEditMode(!editMode)}
+          className={editMode ? 'active' : ''}
+        >
           {editMode ? 'Play Mode' : 'Edit Mode'}
         </button>
       </div>
-      
-      <div ref={gameRef} className="game-container">
-        <svg className="game-svg" width={GRID_SIZE * CELL_SIZE} height={GRID_SIZE * CELL_SIZE}>
-          {/* Background */}
-          <rect width="100%" height="100%" fill="#2a5" />
-          
-          {/* Grid */}
-          {renderGrid()}
-          
-          {/* Barriers */}
-          {barriers.map((row, i) => 
-            row.map((barrier, j) => 
-              barrier && (
-                <rect
-                  key={`barrier-${i}-${j}`}
-                  x={j * CELL_SIZE}
-                  y={i * CELL_SIZE}
-                  width={CELL_SIZE}
-                  height={CELL_SIZE}
-                  fill="#000"
-                />
-              )
-            )
-          )}
-          
-          {/* Trajectory preview */}
-          {renderTrajectoryPreview()}
-          
-          {/* Ball */}
-          <circle
-            cx={(ball.x * CELL_SIZE) + (CELL_SIZE / 2)}
-            cy={(ball.y * CELL_SIZE) + (CELL_SIZE / 2)}
-            r={BALL_SIZE}
-            fill="white"
-          />
-          
-          {/* Hole */}
-          <circle
-            cx={(hole.x * CELL_SIZE) + (CELL_SIZE / 2)}
-            cy={(hole.y * CELL_SIZE) + (CELL_SIZE / 2)}
-            r={HOLE_SIZE}
-            fill="black"
-          />
-        </svg>
+      <div className="instructions">
+        <h3>How to Play:</h3>
+        <ul>
+          <li>Click and drag from the ball to aim</li>
+          <li>Release to shoot</li>
+          <li>Get the ball in the hole</li>
+          <li>Use as few strokes as possible</li>
+          {editMode && <li>Click grid cells to add/remove barriers</li>}
+          {editMode && <li>Drag the hole to reposition it</li>}
+        </ul>
       </div>
+      {gameWon && <div className="win-message">You won in {strokes} strokes!</div>}
     </div>
-  );
+
+    <div ref={gameRef} className="game-container">
+      <svg 
+        className="game-svg" 
+        width={GRID_SIZE * CELL_SIZE} 
+        height={GRID_SIZE * CELL_SIZE}
+        viewBox={`0 0 ${GRID_SIZE * CELL_SIZE} ${GRID_SIZE * CELL_SIZE}`}
+      >
+        {/* Background */}
+        <rect width="100%" height="100%" fill="#2a5" />
+        
+        {/* Grid */}
+        {renderGrid()}
+        
+        {/* Barriers */}
+        {barriers.map((row, i) => 
+          row.map((barrier, j) => 
+            barrier && (
+              <rect
+                key={`barrier-${i}-${j}`}
+                x={j * CELL_SIZE}
+                y={i * CELL_SIZE}
+                width={CELL_SIZE}
+                height={CELL_SIZE}
+                fill="#000"
+              />
+            )
+          )
+        )}
+        
+        {/* Trajectory preview */}
+        {renderTrajectoryPreview()}
+        
+        {/* Ball */}
+        <circle
+          cx={(ball.x * CELL_SIZE) + (CELL_SIZE / 2)}
+          cy={(ball.y * CELL_SIZE) + (CELL_SIZE / 2)}
+          r={BALL_SIZE}
+          fill="white"
+        />
+        
+        {/* Hole */}
+        <circle
+          cx={(hole.x * CELL_SIZE) + (CELL_SIZE / 2)}
+          cy={(hole.y * CELL_SIZE) + (CELL_SIZE / 2)}
+          r={HOLE_SIZE}
+          fill="black"
+        />
+      </svg>
+    </div>
+  </div>
+);
 };
 
 export default MiniGolfGame;
