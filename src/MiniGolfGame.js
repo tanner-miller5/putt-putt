@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import './GolfGameStyles.css';
 
-const CELL_SIZE = 50;
 const GRID_SIZE = 10;
-const BALL_SPEED = 0.1;
+const CELL_SIZE = 40;
 
 const MiniGolfGame = () => {
   const gridRef = useRef(null);
@@ -21,8 +20,11 @@ const MiniGolfGame = () => {
   const [clubAngle, setClubAngle] = useState(0);
   // Add new state for hole preview
   const [previewHole, setPreviewHole] = useState(null);
-// Add state for game won
-const [gameWon, setGameWon] = useState(false);
+  // Add state for game won
+  const [gameWon, setGameWon] = useState(false);
+  const [canMoveHole, setCanMoveHole] = useState(true);
+  const [showTrajectory, setShowTrajectory] = useState(false);
+
 
 // Update the calculateBallPath function with improved collision detection
 const calculateBallPath = (dx, dy, power) => {
@@ -40,7 +42,7 @@ const calculateBallPath = (dx, dy, power) => {
     const cellX = Math.floor(x);
     const cellY = Math.floor(y);
     const cellCenterX = cellX + 0.5;
-    const cellCenterY = cellY + 0.5;
+    const cellCenterY = cellY + 0.5;  // Fixed from cellCenterY
     
     // Check if position is within grid bounds
     if (cellX >= 0 && cellX < GRID_SIZE && cellY >= 0 && cellY < GRID_SIZE) {
@@ -144,23 +146,37 @@ const calculateBallPath = (dx, dy, power) => {
   return { moves, inHole };
 };
 
-// Add mouse event handlers
-const handleMouseDown = (e) => {
-  if (ballMoving) return;
-  
-  const rect = gridRef.current.getBoundingClientRect();
-  const dragStartPos = {
-    x: e.clientX - rect.left,
-    y: e.clientY - rect.top
-  };
-  setDragStart(dragStartPos);
-  setDragEnd(dragStartPos); // Initialize dragEnd to prevent undefined on first move
-  setIsDragging(true);
+// Add or update the mouse event handlers
+  const handleMouseDown = (e) => {
+    if (ballMoving) return;
 
-  // Add mouse move and up handlers
+    const rect = gridRef.current.getBoundingClientRect();
+    const cellSize = rect.width / GRID_SIZE;
+
+    // Calculate click position relative to grid
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    // Calculate ball position in pixels
+    const ballPixelX = ball.x * cellSize + cellSize / 2;
+    const ballPixelY = ball.y * cellSize + cellSize / 2;
+
+    // Check if click is on the ball (within a small radius)
+    const dx = clickX - ballPixelX;
+    const dy = clickY - ballPixelY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance <= cellSize / 2) {
+      setIsDragging(true);
+      setDragStart({ x: clickX, y: clickY });
+      setDragEnd({ x: clickX, y: clickY });
+    }
+  };
+
   const handleMouseMove = (e) => {
     if (!isDragging || ballMoving) return;
-    
+
+    const rect = gridRef.current.getBoundingClientRect();
     const newDragEnd = {
       x: e.clientX - rect.left,
       y: e.clientY - rect.top
@@ -168,29 +184,25 @@ const handleMouseDown = (e) => {
     setDragEnd(newDragEnd);
   };
 
-  const handleMouseUp = (e) => {
+  const handleMouseUp = () => {
     if (!isDragging || ballMoving) return;
-    
-    setIsDragging(false);
-    const dx = dragStart.x - dragEnd.x;
-    const dy = dragStart.y - dragEnd.y;
+
+    const dx = dragEnd.x - dragStart.x;
+    const dy = dragEnd.y - dragStart.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
-    
-    if (distance > 5) {
-      moveBall(dx, dy, distance);
-      setStrokes(strokes + 1);
+
+    if (distance > 5) { // Minimum distance threshold to prevent accidental hits
+      // Reverse the direction (drag backwards to shoot forwards)
+      moveBall(-dx, -dy, distance);
+      setStrokes(prev => prev + 1);
     }
-    
+
+    setIsDragging(false);
     setDragStart(null);
     setDragEnd(null);
-    
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
   };
 
-  document.addEventListener('mousemove', handleMouseMove);
-  document.addEventListener('mouseup', handleMouseUp);
-};
+
 
 // Touch event handlers
 const [touchRect, setTouchRect] = useState(null);
@@ -251,131 +263,112 @@ const handleTouchStart = (e) => {
   document.addEventListener('touchend', handleTouchEnd);
 };
 
-// Add aiming line render if dragging
-const renderAimingLine = () => {
-  if (!isDragging || !dragStart || !dragEnd) return null;
-  
-  return (
-    <svg className="aim-overlay" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-      <line
-        x1={dragStart.x}
-        y1={dragStart.y}
-        x2={dragEnd.x}
-        y2={dragEnd.y}
-        stroke="rgba(255, 255, 255, 0.8)"
-        strokeWidth="2"
-        strokeDasharray="5,5"
-      />
-    </svg>
-  );
-};
-
-// Add handleMouseUp function
-const handleMouseUp = (e) => {
-  if (!isDragging || ballMoving) return;
-  
-  setIsDragging(false);
-  const dx = dragStart.x - dragEnd.x;
-  const dy = dragStart.y - dragEnd.y;
-  const distance = Math.sqrt(dx * dx + dy * dy);
-  
-  if (distance > 5) {
-    moveBall(dx, dy, distance);
-    setStrokes(strokes + 1);
-  }
-  
-  setDragStart(null);
-  setDragEnd(null);
-};
-
-// Update hole dragging with proper event handling
-const handleHoleDragStart = (e) => {
-  if (ballMoving) return;
-  e.preventDefault();
-  e.stopPropagation(); // Stop event from bubbling up to grid
-  
-  const pos = e.touches ? e.touches[0] : e;
-  const rect = gridRef.current.getBoundingClientRect();
-  setIsDraggingHole(true);
-
-  const updateHolePreview = (clientX, clientY) => {
-    const x = Math.floor((clientX - rect.left) / (rect.width / GRID_SIZE));
-    const y = Math.floor((clientY - rect.top) / (rect.height / GRID_SIZE));
-    
-    if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
-      if (grid[y][x] !== 1 && (x !== Math.floor(ball.x) || y !== Math.floor(ball.y))) {
-        setPreviewHole({ x, y });
-      }
-    }
-  };
-
-  const handleMove = (e) => {
-    if (!isDraggingHole) return;
+// Update the handleHoleDragStart
+  const handleHoleDragStart = (e) => {
+    if (ballMoving || !canMoveHole) return;
     e.preventDefault();
-    e.stopPropagation();
-    const movePos = e.touches ? e.touches[0] : e;
-    updateHolePreview(movePos.clientX, movePos.clientY);
+
+    const rect = gridRef.current.getBoundingClientRect();
+    const cellSize = rect.width / GRID_SIZE;
+    setIsDraggingHole(true);
+    setShowTrajectory(false); // Hide trajectory when dragging hole
+
+    const handleHoleMove = (moveEvent) => {
+      if (!isDraggingHole) return;
+      moveEvent.preventDefault();
+
+      const clientX = moveEvent.touches ? moveEvent.touches[0].clientX : moveEvent.clientX;
+      const clientY = moveEvent.touches ? moveEvent.touches[0].clientY : moveEvent.clientY;
+
+      const x = Math.floor((clientX - rect.left) / cellSize);
+      const y = Math.floor((clientY - rect.top) / cellSize);
+
+      if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
+        const ballX = Math.floor(ball.x);
+        const ballY = Math.floor(ball.y);
+        if (grid[y][x] !== 1 && (x !== ballX || y !== ballY)) {
+          setHole({ x, y });
+        }
+      }
+    };
+
+    const handleHoleEnd = () => {
+      setIsDraggingHole(false);
+      setShowTrajectory(false);
+    };
+
+    document.addEventListener('mousemove', handleHoleMove);
+    document.addEventListener('mouseup', handleHoleEnd);
+    document.addEventListener('touchmove', handleHoleMove, { passive: false });
+    document.addEventListener('touchend', handleHoleEnd);
   };
 
-  const handleEnd = (e) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    setIsDraggingHole(false);
-    if (previewHole) {
-      setHole(previewHole);
-    }
-    setPreviewHole(null);
-    document.removeEventListener('mousemove', handleMove);
-    document.removeEventListener('mouseup', handleEnd);
-    document.removeEventListener('touchmove', handleMove);
-    document.removeEventListener('touchend', handleEnd);
+
+// Update the handleBallDragStart
+  const handleBallDragStart = (e) => {
+    if (ballMoving || isDraggingHole) return;
+
+    e.preventDefault();
+    const rect = gridRef.current.getBoundingClientRect();
+    const startPos = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    };
+
+    setIsDragging(true);
+    setDragStart(startPos);
+    setDragEnd(startPos);
+    setShowGolfClub(true);
+    setShowTrajectory(!isDraggingHole); // Only show trajectory if not dragging hole
   };
 
-  document.addEventListener('mousemove', handleMove);
-  document.addEventListener('mouseup', handleEnd);
-  document.addEventListener('touchmove', handleMove);
-  document.addEventListener('touchend', handleEnd);
-  
-  updateHolePreview(pos.clientX, pos.clientY);
-};
-
-// Update handleBallDragStart function
-const handleBallDragStart = (e) => {
-  if (ballMoving || isDraggingHole) return;
-  
-  e.preventDefault();
-  const rect = gridRef.current.getBoundingClientRect();
-  const startPos = {
-    x: e.clientX - rect.left,
-    y: e.clientY - rect.top
-  };
-  
-  setIsDragging(true);
-  setDragStart(startPos);
-  setDragEnd(startPos);
-  setShowGolfClub(true);
-};
-
-  useEffect(() => {
-    initializeGame();
-  }, []);
 
   const initializeGame = () => {
-    // First create empty grid
-    const newGrid = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(0));
+    // Cancel any ongoing animations
+    setBallMoving(false);
+    setShowGolfClub(false);
+    setIsDragging(false);
+    setDragStart(null);
+    setDragEnd(null);
     
-    // Set initial positions
+    // Reset the game state
+    const newGrid = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(0));
     const startBallX = 1;
     const startBallY = 1;
-    const startHoleX = 8;
-    const startHoleY = 8;
+    
+    // First create empty grid
+    //const newGrid = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(0));
+    
+    // Set initial positions
+    //const startBallX = 1;
+    //const startBallY = 1;
+    
+    // Find a valid hole position (not on a barrier and not near the ball)
+    const getValidHolePosition = () => {
+      const minDistance = 4; // Minimum distance from ball
+      while (true) {
+        const x = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
+        const y = Math.floor(Math.random() * (GRID_SIZE - 2)) + 1;
+        
+        // Check distance from ball
+        const distance = Math.sqrt(
+          Math.pow(x - startBallX, 2) + Math.pow(y - startBallY, 2)
+        );
+        
+        if (distance >= minDistance) {
+          return { x, y };
+        }
+      }
+    };
+
+    const holePos = getValidHolePosition();
+    const startHoleX = holePos.x;
+    const startHoleY = holePos.y;
 
     // Clear areas around ball and hole
-    const clearArea = (x, y) => {
-      for (let i = -1; i <= 1; i++) {
-        for (let j = -1; j <= 1; j++) {
+    const clearArea = (x, y, radius = 1) => {
+      for (let i = -radius; i <= radius; i++) {
+        for (let j = -radius; j <= radius; j++) {
           const newX = x + i;
           const newY = y + j;
           if (newX >= 0 && newX < GRID_SIZE && newY >= 0 && newX < GRID_SIZE) {
@@ -392,8 +385,9 @@ const handleBallDragStart = (e) => {
         x = Math.floor(Math.random() * GRID_SIZE);
         y = Math.floor(Math.random() * GRID_SIZE);
       } while (
-        (Math.abs(x - startBallX) <= 1 && Math.abs(y - startBallY) <= 1) || // Keep area around ball clear
-        (Math.abs(x - startHoleX) <= 1 && Math.abs(y - startHoleY) <= 1) || // Keep area around hole clear
+        // Keep areas around ball and hole clear
+        (Math.abs(x - startBallX) <= 1 && Math.abs(y - startBallY) <= 1) ||
+        (Math.abs(x - startHoleX) <= 1 && Math.abs(y - startHoleY) <= 1) ||
         newGrid[y][x] === 1
       );
       newGrid[y][x] = 1;
@@ -406,32 +400,70 @@ const handleBallDragStart = (e) => {
     setBall({ x: startBallX, y: startBallY });
     setHole({ x: startHoleX, y: startHoleY });
     setGrid(newGrid);
-    setStrokes(0);
-    setBallMoving(false);
-    setGameWon(false); // Make sure to reset the game won state
-    setShowGolfClub(false);
-    setIsDragging(false);
-    setDragStart(null);
-    setDragEnd(null);
+    setStrokes(0);  // Make sure strokes are reset
+    setGameWon(false);
   };
 
-  // Update the moveBall function
-  const moveBall = (dx, dy, power) => {
+  // Add useEffect for handleMouseMove
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (isDragging && !ballMoving) {
+        const rect = gridRef.current.getBoundingClientRect();
+        const newDragEnd = {
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top
+        };
+        setDragEnd(newDragEnd);
+        
+        // Calculate club angle
+        const ballScreenX = (ball.x * rect.width) / GRID_SIZE;
+        const ballScreenY = (ball.y * rect.height) / GRID_SIZE;
+        const dx = newDragEnd.x - ballScreenX;
+        const dy = newDragEnd.y - ballScreenY;
+        const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+        setClubAngle(angle);
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, [isDragging, ballMoving, ball.x, ball.y]);
+
+// Update moveBall function
+  const moveBall = (dx, dy, distance) => {
     if (ballMoving) return;
-    
+
     setBallMoving(true);
-    const { moves, inHole } = calculateBallPath(dx, dy, power);
+    setCanMoveHole(false);
+
+    // Normalize the direction vector
+    const length = Math.sqrt(dx * dx + dy * dy);
+    const normalizedDx = dx / length;
+    const normalizedDy = dy / length;
+
+    // Scale the power based on drag distance
+    const power = Math.min(distance * 0.2, 50); // Cap the maximum power
+
+    // Calculate the final velocities
+    const velocityX = normalizedDx * power;
+    const velocityY = normalizedDy * power;
+
+    const { moves, inHole } = calculateBallPath(velocityX, velocityY, power);
     let moveIndex = 0;
-    
+
     const animate = () => {
       if (moveIndex >= moves.length) {
         setBallMoving(false);
-        // Get final ball position
+        setCanMoveHole(true);
         const finalPos = moves[moves.length - 1];
-        // Check if final position matches hole position
-        if (inHole) {
+
+        if (inHole &&
+            Math.abs(finalPos.x - hole.x) < 0.4 &&
+            Math.abs(finalPos.y - hole.y) < 0.4) {
           setGameWon(true);
         }
+
+        setBall(finalPos);
         return;
       }
 
@@ -442,6 +474,8 @@ const handleBallDragStart = (e) => {
 
     animate();
   };
+
+
 
   // Add this function to find a valid initial hole position
 const findValidHolePosition = () => {
@@ -465,90 +499,157 @@ const findValidHolePosition = () => {
 useEffect(() => {
   const initialHolePos = findValidHolePosition();
   setHole({ x: initialHolePos.x, y: initialHolePos.y });
-}, []);
+}, [grid, ball.x, ball.y]); // Add missing dependencies for findValidHolePosition
 
 const getTrajectoryArrow = () => {
-  if (!isDragging) return null;
+  if (!isDragging || !gridRef.current) return null;
 
-  const startX = ball.x * CELL_SIZE + CELL_SIZE/2;
-  const startY = ball.y * CELL_SIZE + CELL_SIZE/2;
-  const dx = dragStart.x - dragEnd.x;
-  const dy = dragStart.y - dragEnd.y;
+  const rect = gridRef.current.getBoundingClientRect();
+  const cellSize = rect.width / GRID_SIZE;
+
+  // Calculate ball center position in screen coordinates
+  const ballScreenX = (ball.x * cellSize) + (cellSize / 2);
+  const ballScreenY = (ball.y * cellSize) + (cellSize / 2);
+
+  // Calculate direction from ball center position to cursor
+  const dx = dragEnd.x - ballScreenX;
+  const dy = dragEnd.y - ballScreenY;
   const distance = Math.sqrt(dx * dx + dy * dy);
 
   if (distance < 5) return null;
 
-  let currentDirX = dx / distance;
-  let currentDirY = dy / distance;
+  const paths = [];
+  let currentPath = [];
+  let willWin = false;
+
+  // Calculate initial direction and power
+  const power = Math.min(distance * 0.2, 20);
+  const dirX = -dx / distance;  // Reverse direction for shooting
+  const dirY = -dy / distance;
   
+  // Rest of the function remains the same...
+
   let currentX = ball.x;
   let currentY = ball.y;
-  let points = [`M ${startX} ${startY}`];
-  let remainingDistance = Math.min(distance * 0.2, 20);
-  let willWin = false;
-  
-  while (remainingDistance > 0) {
-    const nextX = currentX + currentDirX;
-    const nextY = currentY + currentDirY;
-    const gridX = Math.floor(nextX);
-    const gridY = Math.floor(nextY);
+  let currentDirX = dirX;
+  let currentDirY = dirY;
+  const stepSize = 0.1;
+  let remainingSteps = power / stepSize;
+
+  // Add initial position
+  currentPath.push({ x: currentX, y: currentY });
+
+  while (remainingSteps > 0) {
+    const nextX = currentX + currentDirX * stepSize;
+    const nextY = currentY + currentDirY * stepSize;
 
     // Check for hole
-    if (Math.abs(nextX - hole.x) < 0.5 && Math.abs(nextY - hole.y) < 0.5) {
+    if (Math.abs(nextX - hole.x) < 0.4 && Math.abs(nextY - hole.y) < 0.4) {
+      currentPath.push({ x: hole.x, y: hole.y });
+      paths.push(currentPath);
       willWin = true;
       break;
     }
 
-    // Check for collision with barriers
-    if (gridX < 0 || gridX >= GRID_SIZE || gridY < 0 || gridY >= GRID_SIZE ||
-        grid[gridY][gridX] === 1) {
-      // Create new direction vectors after collision
-      if (Math.floor(nextX) !== Math.floor(currentX)) {
-        currentDirX *= -1;
-      }
-      if (Math.floor(nextY) !== Math.floor(currentY)) {
-        currentDirY *= -1;
+    // Check for collisions
+    let collision = false;
+    let newDirX = currentDirX;
+    let newDirY = currentDirY;
+
+    // Boundary collisions
+    if (nextX < 0 || nextX >= GRID_SIZE || nextY < 0 || nextY >= GRID_SIZE) {
+      collision = true;
+      if (nextX < 0 || nextX >= GRID_SIZE) newDirX *= -1;
+      if (nextY < 0 || nextY >= GRID_SIZE) newDirY *= -1;
+    } else {
+      // Barrier collisions
+      const gridX = Math.floor(nextX);
+      const gridY = Math.floor(nextY);
+      
+      if (grid[gridY]?.[gridX] === 1) {
+        collision = true;
+        const relX = nextX - gridX;
+        const relY = nextY - gridY;
+        
+        if (Math.abs(relX - 0.5) > Math.abs(relY - 0.5)) {
+          newDirX *= -1;
+        } else {
+          newDirY *= -1;
+        }
       }
     }
 
-    currentX += currentDirX;
-    currentY += currentDirY;
-    remainingDistance -= 1;
+    if (collision) {
+      // End current path segment
+      paths.push([...currentPath]);
+      
+      // Start new path segment
+      currentPath = [{ x: currentX, y: currentY }];
+      
+      // Update direction with energy loss
+      currentDirX = newDirX * 0.8;
+      currentDirY = newDirY * 0.8;
+      
+      // Stop if speed is too low
+      if (Math.abs(currentDirX) < 0.01 && Math.abs(currentDirY) < 0.01) {
+        break;
+      }
+    } else {
+      currentX = nextX;
+      currentY = nextY;
+      currentPath.push({ x: currentX, y: currentY });
+    }
 
-    points.push(`L ${currentX * CELL_SIZE + CELL_SIZE/2} ${currentY * CELL_SIZE + CELL_SIZE/2}`);
+    remainingSteps--;
+  }
+
+  // Add final path if not empty
+  if (currentPath.length > 1) {
+    paths.push(currentPath);
   }
 
   return (
-    <path
-      className="trajectory"
-      d={points.join(' ')}
-      stroke={willWin ? "#00ff00" : "red"}
-      strokeWidth="2"
-      strokeDasharray="5,5"
-      markerEnd="url(#arrowhead)"
-    />
+    <svg
+      className="aim-overlay"
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        pointerEvents: 'none'
+      }}
+    >
+      <defs>
+        <marker
+          id="arrowhead"
+          markerWidth="10"
+          markerHeight="7"
+          refX="9"
+          refY="3.5"
+          orient="auto"
+        >
+          <polygon 
+            points="0 0, 10 3.5, 0 7" 
+            fill={willWin ? "#00ff00" : "red"}
+          />
+        </marker>
+      </defs>
+      {paths.map((pathPoints, index) => (
+        <path
+          key={index}
+          d={pathPoints.map((point, i) => 
+            `${i === 0 ? 'M' : 'L'} ${point.x * cellSize + cellSize/2} ${point.y * cellSize + cellSize/2}`
+          ).join(' ')}
+          stroke={willWin ? "#00ff00" : "red"}
+          strokeWidth="2"
+          strokeDasharray="5,5"
+          fill="none"
+          markerEnd={index === paths.length - 1 ? "url(#arrowhead)" : ""}
+        />
+      ))}
+    </svg>
   );
-};
-
-
-// Update the club angle calculation in handleMouseMove
-const handleMouseMove = (e) => {
-  if (isDragging && !ballMoving) {
-    const rect = gridRef.current.getBoundingClientRect();
-    const newDragEnd = {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    };
-    setDragEnd(newDragEnd);
-    
-    // Fix club angle calculation by using cell size adjusted ball position
-    const ballScreenX = (ball.x * rect.width) / GRID_SIZE;
-    const ballScreenY = (ball.y * rect.height) / GRID_SIZE;
-    const dx = newDragEnd.x - ballScreenX;
-    const dy = newDragEnd.y - ballScreenY;
-    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-    setClubAngle(angle);
-  }
 };
 
   useEffect(() => {
@@ -610,21 +711,19 @@ const handleMouseMove = (e) => {
   const handleCellDoubleClick = (rowIndex, colIndex) => {
     if (ballMoving) return;
     
-    // Check if trying to place barrier on ball
+    // Calculate the actual ball and hole positions on the grid
     const ballGridX = Math.floor(ball.x);
     const ballGridY = Math.floor(ball.y);
-    if (colIndex === ballGridX && rowIndex === ballGridY) {
-      return;
-    }
-
-    // Check if trying to place barrier on hole
     const holeGridX = Math.floor(hole.x);
     const holeGridY = Math.floor(hole.y);
-    if (colIndex === holeGridX && rowIndex === holeGridY) {
+    
+    // Check if trying to place barrier on ball or hole
+    if ((colIndex === ballGridX && rowIndex === ballGridY) ||
+        (colIndex === holeGridX && rowIndex === holeGridY)) {
       return;
     }
 
-    const newGrid = [...grid];
+    const newGrid = grid.map(row => [...row]); // Create a deep copy
     newGrid[rowIndex][colIndex] = newGrid[rowIndex][colIndex] === 1 ? 0 : 1;
     setGrid(newGrid);
   };
@@ -638,36 +737,86 @@ useEffect(() => {
   }
 }, []);
 
-  return (
-    <div className="game-container">
-      <div className="golf-game">
-        {gameWon && (
-          <div className="win-message">
-            <h2>🎉 Congratulations! 🎉</h2>
-            <p>You completed the course in {strokes} {strokes === 1 ? 'stroke' : 'strokes'}!</p>
-            <button
-              className="play-again-button"
-              onClick={() => {
-                setGameWon(false);
-                initializeGame();
-              }}
-            >
-              Play Again
-            </button>
-          </div>
-        )}
-        
-        {/* Rest of your existing JSX */}
-        <div className="instructions">
-          {/* ... */}
-        </div>
+// Update the CSS for better layout and instruction visibility
 
-        <div className="score-board">
-          Strokes: {strokes}
+// Add aim line rendering
+  const renderAimingLine = () => {
+    if (!isDragging || !dragStart || !dragEnd) return null;
+
+    const dx = dragEnd.x - dragStart.x;
+    const dy = dragEnd.y - dragStart.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    return (
+        <svg
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              pointerEvents: 'none'
+            }}
+        >
+          <line
+              x1={dragStart.x}
+              y1={dragStart.y}
+              x2={dragEnd.x}
+              y2={dragEnd.y}
+              stroke="rgba(255, 255, 255, 0.6)"
+              strokeWidth="2"
+              strokeDasharray="5,5"
+          />
+          <line
+              x1={dragStart.x}
+              y1={dragStart.y}
+              x2={dragStart.x + (-dx * 0.2)}
+              y2={dragStart.y + (-dy * 0.2)}
+              stroke="rgba(255, 0, 0, 0.6)"
+              strokeWidth="2"
+          />
+        </svg>
+    );
+  };
+
+
+// Update the return statement with new layout
+return (
+  <div className="game-container">
+    <div className="game-header">
+      <div className="instructions">
+        <h2>How to Play</h2>
+        <ul>
+          <li>Click and drag the white ball to aim and set power</li>
+          <li>Release to hit the ball towards the black hole</li>
+          <li>Click and drag the black hole to move it to a new location (only when the ball is stationary)</li>
+          <li>Double-click any empty cell to create or remove barriers</li>
+          <li>Get the ball into the hole with the fewest shots possible!</li>
+        </ul>
+      </div>
+      <div className="score-board">
+        Strokes: {strokes}
+      </div>
+    </div>
+
+    <div className="golf-game">
+      {gameWon && (
+        <div className="win-message">
+          <h2>🎉 Congratulations! 🎉</h2>
+          <p>You completed the course in {strokes} {strokes === 1 ? 'stroke' : 'strokes'}!</p>
+          <button
+            className="play-again-button"
+            onClick={() => {
+              setGameWon(false);
+              setStrokes(0);
+              initializeGame();
+            }}
+          >
+            Play Again
+          </button>
         </div>
-        
-        {/* ... rest of your existing component JSX ... */}
-      
+      )}
+
       <div 
         ref={gridRef}
         className="golf-grid"
@@ -688,18 +837,20 @@ useEffect(() => {
           </div>
         ))}
 
-<div
-  className="ball-container"
-  style={{
-    left: `${(ball.x * (100 / GRID_SIZE))}%`,
-    top: `${(ball.y * (100 / GRID_SIZE))}%`,
-  }}
-  onMouseDown={handleMouseDown}
-  onTouchStart={handleTouchStart}
->
-  <div className="ball" />
-</div>
-      {renderAimingLine()}
+        <div
+          className="ball-container"
+          style={{
+            left: `${(ball.x * (100 / GRID_SIZE))}%`,
+            top: `${(ball.y * (100 / GRID_SIZE))}%`,
+          }}
+          onMouseDown={handleMouseDown}
+          onTouchStart={handleTouchStart}
+        >
+          <div className="ball" />
+        </div>
+
+        {isDragging && renderAimingLine()}
+        {isDragging && getTrajectoryArrow()}
 
         <div
           className="hole"
@@ -708,71 +859,17 @@ useEffect(() => {
             left: `${(hole.x * 100) / GRID_SIZE}%`,
             top: `${(hole.y * 100) / GRID_SIZE}%`,
             width: `${100 / GRID_SIZE}%`,
-            height: `${100 / GRID_SIZE}%`
+            height: `${100 / GRID_SIZE}%`,
+            cursor: 'move',
+            zIndex: isDraggingHole ? 1000 : 3,
           }}
           onMouseDown={handleHoleDragStart}
           onTouchStart={handleHoleDragStart}
         />
-
-        <svg
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            pointerEvents: 'none',
-            zIndex: 3
-          }}
-        >
-          <defs>
-            <marker
-              id="arrowhead"
-              markerWidth="10"
-              markerHeight="7"
-              refX="9"
-              refY="3.5"
-              orient="auto"
-            >
-              <polygon points="0 0, 10 3.5, 0 7" fill="red" />
-            </marker>
-          </defs>
-          {isDragging && getTrajectoryArrow()}
-        </svg>
-        {showGolfClub && (
-          <div
-            className="golf-club"
-            style={{
-              position: 'absolute',
-              width: '40px',
-              height: '4px',
-              backgroundColor: '#666',
-              transformOrigin: 'left center',
-              left: `${ball.x * CELL_SIZE + CELL_SIZE/2}px`,
-              top: `${ball.y * CELL_SIZE + CELL_SIZE/2}px`,
-              transform: `rotate(${clubAngle}deg)`,
-              zIndex: 3,
-              pointerEvents: 'none'
-            }}
-          />
-        )}
-        {/* Add hole preview */}
-        {previewHole && (
-          <div
-            className="hole preview"
-            style={{
-              position: 'absolute',
-              left: `${previewHole.x * 100}%`,
-              top: `${previewHole.y * 100}%`,
-              width: `${100 / GRID_SIZE}%`,
-              height: `${100 / GRID_SIZE}%`
-            }}
-          />
-        )}
       </div>
     </div>
-    </div>
-  );
+  </div>
+);
 };
 
 export default MiniGolfGame;
