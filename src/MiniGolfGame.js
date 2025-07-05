@@ -126,13 +126,24 @@ const MiniGolfGame = () => {
     setAimEnd(null);
   }, [initialState]);
 
-  // Update the handlePointerDown function to handle both ball aiming and hole dragging
   const handlePointerDown = useCallback((e) => {
     if (ballMoving) return;
 
     const rect = gameRef.current.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
+    const svgWidth = rect.width;
+    const svgHeight = rect.height;
+    
+    // Calculate the scaling factor
+    const scaleX = (GRID_SIZE * CELL_SIZE) / svgWidth;
+    const scaleY = (GRID_SIZE * CELL_SIZE) / svgHeight;
+
+    // Get touch or mouse coordinates
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    // Calculate the actual position in the SVG coordinate space
+    const mouseX = (clientX - rect.left) * scaleX;
+    const mouseY = (clientY - rect.top) * scaleY;
     
     // Convert positions to screen coordinates
     const ballScreenX = ball.x * CELL_SIZE + CELL_SIZE / 2;
@@ -180,13 +191,25 @@ const MiniGolfGame = () => {
     }
   }, [ball.x, ball.y, hole.x, hole.y, ballMoving, editMode]);
 
-  // Update handlePointerMove to handle both aiming and hole dragging
+  // Also update handlePointerMove with the same coordinate calculation
   const handlePointerMove = useCallback((e) => {
     if (!isAiming && !isDraggingHole) return;
 
     const rect = gameRef.current.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
+    const svgWidth = rect.width;
+    const svgHeight = rect.height;
+    
+    // Calculate the scaling factor
+    const scaleX = (GRID_SIZE * CELL_SIZE) / svgWidth;
+    const scaleY = (GRID_SIZE * CELL_SIZE) / svgHeight;
+
+    // Get touch or mouse coordinates
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    // Calculate the actual position in the SVG coordinate space
+    const mouseX = (clientX - rect.left) * scaleX;
+    const mouseY = (clientY - rect.top) * scaleY;
 
     if (isDraggingHole) {
       // Convert mouse position to grid coordinates

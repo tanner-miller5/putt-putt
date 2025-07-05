@@ -13,12 +13,10 @@
 }
 
 .game-container {
-  position: relative;
-  touch-action: none;
+  touch-action: none; /* Prevent default touch actions */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
   user-select: none;
-  background: #000;
-  padding: 10px;
-  border-radius: 10px;
 }
 
 .instructions {
@@ -485,6 +483,7 @@ button:hover {
   display: block;
   max-width: 100%;
   height: auto;
+  touch-action: none;
 }
 
 @media (max-width: 600px) {
