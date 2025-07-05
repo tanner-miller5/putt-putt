@@ -44,6 +44,8 @@ const MiniGolfGame = () => {
   const [editMode, setEditMode] = useState(false);
   const [ballMoving, setBallMoving] = useState(false);
   const [gameWon, setGameWon] = useState(false);
+  // Add this to your state declarations
+  const [instructionsMinimized, setInstructionsMinimized] = useState(false);
 
   // Game mechanics
   const hasBarrier = useCallback((x, y) => {
@@ -360,33 +362,47 @@ const MiniGolfGame = () => {
   // Update the return statement with new layout
 return (
   <div className="game-page">
+    {/* Update the instructions panel in the return statement */}
     <div className="instructions-panel">
-      <h2>Mini Golf</h2>
-      <div className="game-controls">
-        <div className="strokes">Strokes: {strokes}</div>
-        <button onClick={() => {
-          resetGame();
-          setGameWon(false);
-        }}>Reset Game</button>
+      <div className="instructions-header">
+        <h2>Mini Golf</h2>
         <button 
-          onClick={() => setEditMode(!editMode)}
-          className={editMode ? 'active' : ''}
+          className="minimize-button"
+          onClick={() => setInstructionsMinimized(!instructionsMinimized)}
+          aria-label={instructionsMinimized ? "Show Instructions" : "Hide Instructions"}
         >
-          {editMode ? 'Play Mode' : 'Edit Mode'}
+          {instructionsMinimized ? "+" : "−"}
         </button>
       </div>
-      <div className="instructions">
-        <h3>How to Play:</h3>
-        <ul>
-          <li>Click and drag from the ball to aim</li>
-          <li>Release to shoot</li>
-          <li>Get the ball in the hole</li>
-          <li>Use as few strokes as possible</li>
-          {editMode && <li>Click grid cells to add/remove barriers</li>}
-          {editMode && <li>Drag the hole to reposition it</li>}
-        </ul>
+      
+      <div className={`collapsible-content ${instructionsMinimized ? 'minimized' : ''}`}>
+        <div className="game-controls">
+          <div className="strokes">Strokes: {strokes}</div>
+          <button onClick={() => {
+            resetGame();
+            setGameWon(false);
+          }}>Reset Game</button>
+          <button 
+            onClick={() => setEditMode(!editMode)}
+            className={editMode ? 'active' : ''}
+          >
+            {editMode ? 'Play Mode' : 'Edit Mode'}
+          </button>
+        </div>
+        
+        <div className="instructions">
+          <h3>How to Play:</h3>
+          <ul>
+            <li>Click and drag from the ball to aim</li>
+            <li>Release to shoot</li>
+            <li>Get the ball in the hole</li>
+            <li>Use as few strokes as possible</li>
+            {editMode && <li>Click grid cells to add/remove barriers</li>}
+            {editMode && <li>Drag the hole to reposition it</li>}
+          </ul>
+        </div>
+        {gameWon && <div className="win-message">You won in {strokes} strokes!</div>}
       </div>
-      {gameWon && <div className="win-message">You won in {strokes} strokes!</div>}
     </div>
 
     <div ref={gameRef} className="game-container">
