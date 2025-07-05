@@ -19,10 +19,14 @@ A simple browser-based mini golf game built with React.
 
 ### Game Features
 - Realistic ball physics with friction and collisions
-- Trajectory preview line while aiming
+- Trajectory preview line while aiming on the opposite side of the click and drag to hit the ball
+- The ball follows the trajectory preview line when hit
 - Barrier placement for custom course design
 - Stroke counter
 - Win detection and replay option
+- Start the ball in the center of the top left cell
+- Start the hole in the center of the bottom right cell
+- show instructions at the top
 
 ## Development
 
